@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Painel de validade e precificação de produtos por loja.">
+  <title>Controle de Validade | Produtos por Loja</title>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/table.css">
+  <link rel="stylesheet" href="css/groups.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
+        <div><h1>Controle de Validade</h1><p>Produtos, vencimentos e precificação por loja</p></div>
+      </div>
+      <div class="header-actions">
+        <div class="result-summary">
+          <strong id="resultCount">0 de 0 produtos</strong>
+          <small id="editCount">0 células editadas</small>
+        </div>
+        <span id="syncStatus" class="sync-status">Sync: —</span>
+        <button class="btn btn-outline" id="restoreBtn" type="button"><i class="fa-solid fa-rotate-left"></i> Restaurar originais</button>
+        <button class="btn btn-primary" id="exportXlsx" type="button"><i class="fa-solid fa-file-excel"></i> Exportar XLSX</button>
+        <button class="btn btn-secondary" id="exportCsv" type="button"><i class="fa-solid fa-file-csv"></i> Exportar CSV</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card filters-card">
+      <div class="section-heading">
+        <div><h2><i class="fa-solid fa-filter"></i> Filtros</h2><p>Refine os produtos exibidos na tabela</p></div>
+        <div class="filter-actions">
+          <button class="btn btn-rule" id="pricingRule" type="button"><i class="fa-solid fa-bullseye"></i> Regra de Precificação</button>
+          <button class="btn btn-light" id="clearFilters" type="button"><i class="fa-solid fa-eraser"></i> Limpar filtros</button>
+        </div>
+      </div>
+
+      <div class="filters-grid">
+        <label>DATA — de<input id="dateFrom" type="date"></label>
+        <label>DATA — até<input id="dateTo" type="date"></label>
+        <label>LOJA<select id="store"><option value="">Todas</option></select></label>
+        <label>SEGMENTO<select id="segment"><option value="">Todos</option></select></label>
+        <label>STATUS<select id="status"><option value="">Todos</option><option value="PENDENTE">PENDENTE</option><option value="FEITO">FEITO</option></select></label>
+        <label>CATEGORIA.SIST<select id="category"><option value="">Todas</option></select></label>
+        <label>GRUPO<select id="group"><option value="">Todos</option></select></label>
+        <label>DIAS P/ VENC. — mín.<input id="daysMin" type="number" placeholder="Mín."></label>
+        <label>DIAS P/ VENC. — máx.<input id="daysMax" type="number" placeholder="Máx."></label>
+        <label>%DESC<select id="discount"><option value="">Todos</option><option value="zero">0%</option><option value="nonzero">Diferente de 0%</option></select></label>
+        <label>PRECO.PROM<select id="promoPrice"><option value="">Todos</option><option value="zero">= 0</option><option value="positive">&gt; 0</option></select></label>
+        <label class="search-field">Buscar produto<input id="search" type="search" placeholder="Descrição ou código..."></label>
+      </div>
+      <div class="table-meta">
+        <span id="activeFilterInfo">Carregando planilha...</span>
+        <span>Exibindo até 50 produtos por página</span>
+      </div>
+    </section>
+
+    <section class="card table-card">
+      <div class="view-tabs">
+        <button class="view-tab active" data-view-btn="table" type="button">
+          <i class="fa-solid fa-table-list"></i> Tabela plana
+        </button>
+        <button class="view-tab" data-view-btn="groups" type="button">
+          <i class="fa-solid fa-layer-group"></i> Agrupado por validade
+        </button>
+      </div>
+
+      <!-- ============ VIEW: TABELA PLANA ============ -->
+      <div id="tableView">
+        <div class="table-toolbar">
+          <div>
+            <h2><i class="fa-solid fa-table-list"></i> Produtos</h2>
+            <p>Ordene clicando no título de cada coluna. Role horizontalmente para ver todos os campos.</p>
+          </div>
+          <label class="upload-label btn btn-light" for="fileInput"><i class="fa-solid fa-upload"></i> Carregar outra planilha</label>
+          <input id="fileInput" type="file" accept=".xlsx,.xls" hidden>
+        </div>
+        <div id="loading" class="loading"><i class="fa-solid fa-spinner fa-spin"></i> Lendo PRODUTOS VALIDADE LOJA.xlsx...</div>
+        <div id="errorBox" class="error-box" hidden></div>
+        <div class="table-wrap" id="tableWrap" hidden>
+          <table id="productsTable">
+            <thead id="tableHead"></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span id="pageInfo">Página 0 de 0</span>
+          <div>
+            <button class="btn btn-light btn-small" id="prevPage" type="button"><i class="fa-solid fa-chevron-left"></i> Anterior</button>
+            <button class="btn btn-light btn-small" id="nextPage" type="button">Próxima <i class="fa-solid fa-chevron-right"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ VIEW: AGRUPADO POR VALIDADE ============ -->
+      <div id="groupsView" hidden>
+        <div class="groups-toolbar">
+          <div>
+            <h2><i class="fa-solid fa-layer-group"></i> Agrupado por validade</h2>
+            <p>Itens agrupados pela DATA. Produtos a precificar (PRECO.PROM = 0 e %DESC ≠ 0%) aparecem destacados com o PRC.ARRED como alvo.</p>
+          </div>
+          <label class="upload-label btn btn-light" for="fileInputGroups"><i class="fa-solid fa-upload"></i> Carregar outra planilha</label>
+          <input id="fileInputGroups" type="file" accept=".xlsx,.xls" hidden>
+        </div>
+        <div id="groupsSummary" class="groups-summary"></div>
+        <div id="groupsContainer" class="groups-container"></div>
+      </div>
+    </section>
+    <footer>As alterações são salvas somente neste navegador. A planilha original não é modificada.</footer>
+  </main>
+
+  <!-- keyapi.js PRECISA vir antes de config.js -->
+  <script src="js/keyapi.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/fileReader.js"></script>
+  <script src="js/filters.js"></script>
+  <script src="js/editableCells.js"></script>
+  <script src="js/table.js"></script>
+  <script src="js/groups.js"></script>
+  <script src="js/viewToggle.js"></script>
+  <script src="js/sync.js"></script>
+  <script src="js/exporter.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
